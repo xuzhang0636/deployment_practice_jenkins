@@ -3,6 +3,7 @@ pipeline {
   stages {
     stage('Checkout & Prepare') {
       steps {
+        sh 'echo Hello World'
         checkout([
           $class: 'GitSCM',
           branches: [[name: env.GIT_BRANCH]],  // 检出 PR 分支
