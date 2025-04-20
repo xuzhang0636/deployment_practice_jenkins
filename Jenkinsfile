@@ -37,16 +37,18 @@ pipeline {
           )
           
           // If this is a PR, add a comment
-          if (env.CHANGE_ID) {
-            def comment = """
-              ✅ Unit tests passed successfully!
-              This PR is ready to be merged.
-            """.stripIndent()
-            
-            githubNotify(
-              issueNumber: env.CHANGE_ID,
-              comment: comment
-            )
+          script {
+            if (env.CHANGE_ID) {
+              def comment = """
+                ✅ Unit tests passed successfully!
+                This PR is ready to be merged.
+              """.stripIndent()
+              
+              githubNotify(
+                issueNumber: env.CHANGE_ID,
+                comment: comment
+              )
+            }
           }
         }
         failure {
@@ -58,16 +60,18 @@ pipeline {
           )
           
           // If this is a PR, add a comment
-          if (env.CHANGE_ID) {
-            def comment = """
-              ❌ Unit tests failed!
-              Please fix the failing tests before merging.
-            """.stripIndent()
-            
-            githubNotify(
-              issueNumber: env.CHANGE_ID,
-              comment: comment
-            )
+          script {
+            if (env.CHANGE_ID) {
+              def comment = """
+                ❌ Unit tests failed!
+                Please fix the failing tests before merging.
+              """.stripIndent()
+              
+              githubNotify(
+                issueNumber: env.CHANGE_ID,
+                comment: comment
+              )
+            }
           }
         }
       }
