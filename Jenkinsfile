@@ -1,15 +1,28 @@
 pipeline {
   agent any
+  
+  triggers {
+    // Remove polling as we'll use webhooks
+    // pollSCM('* * * * *')
+  }
+  
   stages {
     stage('Checkout & Prepare') {
       steps {
         sh 'echo Hello World'
         checkout([
           $class: 'GitSCM',
-          branches: [[name: env.GIT_BRANCH]],  // 检出 PR 分支
+          branches: [[name: env.CHANGE_BRANCH ?: env.BRANCH_NAME]],  // Use PR branch if available
           extensions: [
-            // 处理 PR 源分支（尤其是 fork 仓库）
-            [$class: 'PreBuildMerge', options: [mergeTarget: env.CHANGE_TARGET]]
+            [$class: 'PreBuildMerge',
+             options: [
+               fastForwardMode: 'FF',
+               mergeTarget: env.CHANGE_TARGET ?: env.BRANCH_NAME,
+               mergeStrategy: 'default',
+               remote: env.CHANGE_FORK ?: env.GIT_URL,
+               refspec: "+refs/heads/${env.CHANGE_BRANCH}:refs/remotes/origin/${env.CHANGE_BRANCH}"
+             ]
+            ]
           ],
           userRemoteConfigs: [[url: env.GIT_URL]]
         ])
@@ -21,20 +34,55 @@ pipeline {
       }
       post {
         success {
-          // 测试通过时，通知 GitHub 状态为 success
+          // Update GitHub PR status
           updateGitHubCommitStatus(
             state: 'SUCCESS',
-            context: 'jenkins/unit-test'
+            context: 'jenkins/unit-test',
+            description: 'Unit tests passed successfully'
           )
+          
+          // If this is a PR, add a comment
+          if (env.CHANGE_ID) {
+            def comment = """
+              ✅ Unit tests passed successfully!
+              This PR is ready to be merged.
+            """.stripIndent()
+            
+            githubNotify(
+              issueNumber: env.CHANGE_ID,
+              comment: comment
+            )
+          }
         }
         failure {
-          // 测试失败时，通知 GitHub 状态为 failure
+          // Update GitHub PR status
           updateGitHubCommitStatus(
             state: 'FAILURE',
-            context: 'jenkins/unit-test'
+            context: 'jenkins/unit-test',
+            description: 'Unit tests failed'
           )
+          
+          // If this is a PR, add a comment
+          if (env.CHANGE_ID) {
+            def comment = """
+              ❌ Unit tests failed!
+              Please fix the failing tests before merging.
+            """.stripIndent()
+            
+            githubNotify(
+              issueNumber: env.CHANGE_ID,
+              comment: comment
+            )
+          }
         }
       }
+    }
+  }
+  
+  post {
+    always {
+      // Clean workspace after build
+      cleanWs()
     }
   }
 }
